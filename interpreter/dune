@@ -1,0 +1,5 @@
+(library
+  (name interpreter)
+  (wrapped false)
+  (libraries domains libs)
+  (flags (:standard -warn-error -A)))
