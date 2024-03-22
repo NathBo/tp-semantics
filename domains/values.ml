@@ -107,51 +107,59 @@ module MakeValueBasics
     let bot = {int = Bot; bool = Bot}
 
     let int_bool_binary_bool
-        (fi: I.t -> I.t -> extent -> bool * bool)
+        (fi: I.t -> I.t -> extent -> bool * bool)   (*le bool*bool c pour (x,not x) ?*)
         (fb: B.t -> B.t -> B.t)
         ({int=ia; bool=ba}: ival)
         ({int=ib; bool=bb}: ival)
         (ext: extent) : ival * err =
-      let x = match ia, ba, ib, bb with
-      | Nb i1, _, Nb i2, _ -> Nb(fi i1 i2 ext)
-      | _ -> Bot in
-      let y = match ia, ba, ib, bb with
-      | _, Nb(b1), _, Nb(b2) -> Nb(fb b1 b2)
-      | _ -> Bot in
-      ({int=x;bool=y},E.empty)
+      let y,e = match ia, ba, ib, bb with
+      | Nb i1, _, Nb i2, _ -> Nb(B.of_bool(fst(fi i1 i2 ext))),E.empty
+      | _, Nb(b1), _, Nb(b2) -> Nb(fb b1 b2),E.empty
+      | _ -> Bot,E.error (E.make_err Typing "" ext) in
+      ({int=Bot;bool=y},e)
 
     let int_unary
         (f: I.t -> extent -> I.t * err)
-        (a: ival)
+        ({int=ia;bool=ba}: ival)
         (ext: extent) : ival * err =
-      assert false
+      match ia with
+        | Nb i -> let a,b = f i ext in {int=Nb(i);bool=Bot},b
+        | Bot -> {int=Bot;bool=Bot},E.error (E.make_err Typing "" ext)
 
     let int_binary
         (fi: I.t -> I.t -> extent -> I.t add_bottom * err)
         ({int=ia; bool=ba}: ival)
         ({int=ib; bool=bb}: ival)
         (ext: extent) : ival * err =
-      assert false
+      match ia,ib with
+        | Nb i1, Nb i2 -> let a,e = fi i1 i2 ext in {int=a;bool=Bot},e
+        | _ -> {int=Bot;bool=Bot},E.error (E.make_err Typing "" ext)
 
     let int_binary_bool
         (f: I.t -> I.t -> extent -> bool * bool)
         ({int=ia; bool=ba}: ival)
         ({int=ib; bool=bb}: ival)
         (ext: extent) : ival * err =
-      assert false
+      match ia,ib with
+        | Nb i1, Nb i2 -> let a = f i1 i2 ext in {int=Bot;bool=Nb(B.of_bool(fst a))},E.empty
+        | _ -> {int=Bot;bool=Bot},E.error (E.make_err Typing "" ext)
 
     let bool_binary
         (fb: B.t -> B.t -> B.t)
         ({int=ia; bool=ba}: ival)
         ({int=ib; bool=bb}: ival)
         (ext: extent) : ival * err =
-      assert false
+        match ba,bb with
+        | Nb b1, Nb b2 -> let a = fb b1 b2 in {int=Bot;bool=Nb(a)},E.empty
+        | _ -> {int=Bot;bool=Bot},E.error (E.make_err Typing "" ext)
 
     let bool_unary
         (fb: B.t -> B.t)
         ({int=ia; bool=ba}: ival)
         (ext: extent) : ival * err =
-      assert false
+        match ba with
+        | Nb b -> let a = fb b in {int=Bot;bool=Nb(a)},E.empty
+        | Bot -> {int=Bot;bool=Bot},E.error (E.make_err Typing "" ext)
 
     let of_int (n: Z.t) : ival = assert false
     let of_bool (b: bool) : ival = assert false
