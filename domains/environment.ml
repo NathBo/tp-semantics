@@ -2,6 +2,11 @@ open Values
 open Constrain
 open Abstract_syntax_tree
 
+let rec range a b =
+  if b-a<=0 then []
+  else a::range (a+1) b
+
+
 module type ENVIRONMENT =
 sig
   module E: Errors.ERRORS
@@ -68,8 +73,37 @@ module MakeConcrete(V: VALUE) : ENVIRONMENT
       in
       ()
 
-    let rec eval_expr (e, ext: expr ext) (env: simple_env) : IvalSet.t * err =
-      assert false
+    let rec eval_expr (e, ext: expr ext) (env: simple_env) : IvalSet.t * err = match e with
+      | AST_int_const i -> IvalSet.singleton (V.of_int i),E.empty
+      | AST_bool_const b -> IvalSet.singleton (V.of_bool b),E.empty
+      | AST_variable (v,ext') -> if SimpleEnv.mem v env then IvalSet.singleton (SimpleEnv.find v env),E.empty else (IvalSet.empty,E.error (E.make_err UndefinedVariable "" ext))
+      | AST_int_rand ((i1,_),(i2,_)) -> IvalSet.of_list (List.map (fun x -> V.of_int (Z.of_int x)) (range (Z.to_int i1) (Z.to_int i2+1))),E.empty
+      | AST_unary (op,arg) -> let valposs, err = eval_expr arg env in
+      begin match op with
+        | AST_UNARY_MINUS -> IvalSet.map (fun x ->  fst(V.uminus x ext)) valposs,err    (*bon je void les erreur mais est-ce grave ? (oui mdr)*)
+        | AST_UNARY_PLUS -> IvalSet.map (fun x ->  fst(V.uplus x ext)) valposs,err
+        | AST_NOT -> IvalSet.map (fun x ->  fst(V.logical_not x ext)) valposs,err
+      end
+      | AST_binary (op,arg1,arg2) -> let arg1, e1 = eval_expr arg1 env in
+      let arg2, e2 = eval_expr arg2 env in
+      let err = E.union e1 e2 in
+      let f =
+        (match op with
+         | AST_PLUS -> V.add
+         | AST_MINUS -> V.sub
+         | AST_MULTIPLY -> V.times
+         | AST_DIVIDE -> V.div
+         | AST_MODULO -> V.modulo
+         | AST_EQUAL -> V.eq
+         | AST_NOT_EQUAL -> V.not_eq
+         | AST_LESS -> V.less
+         | AST_LESS_EQUAL -> V.less_eq
+         | AST_GREATER -> V.greater
+         | AST_GREATER_EQUAL -> V.greater_eq
+         | AST_AND -> V.logical_and
+         | AST_OR -> V.logical_or) in
+      in
+      i, E.union err err_
 
     let eval_assign (l, _: lvalue ext) (e: expr ext) (env: env) : env * err =
       assert false
