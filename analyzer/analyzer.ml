@@ -64,7 +64,7 @@ let select_domain (tp: tp) : (module Interpreter.ITERATOR) =
 let doit filename =
   let prog = File_parser.parse_file filename in
   Abstract_syntax_printer.print_prog Format.std_formatter prog;
-  let interp = select_domain TP1 in
+  let interp = select_domain TP2 in
   let module Interp = (val interp) in
   let env_init = Interp.init in
   let env_final, err = Interp.eval_prog env_init prog in

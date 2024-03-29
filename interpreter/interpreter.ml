@@ -20,22 +20,34 @@ struct
   type env = Env.env
   type err = Env.err
 
-  let lfp (type a) (cmp: a -> a -> int) (f: a -> a) (x: a) : a =
-    assert false
+  let lfp (type a)
+      (cmp: a -> a -> int)
+      (widen: a -> a -> a)
+      (_: a -> a -> a)
+      (f: a -> a)
+      (x: a) : a =
+    let rec iter_widen x =
+      let x' = widen x (f x) in
+      if cmp x x' <= 0 then
+        x'
+      else
+        iter_widen x' in
+    iter_widen x
+
 
   let init : env = Env.init
 
-  let rec eval_stat (s, ext: stat ext) (env: env) : env * err =
+  let rec eval_stat (s, _: stat ext) (_: env) : env * err =
     let env, err =
       match s with
-      | AST_block b -> assert false
-      | AST_assign (l, r) -> assert false
-      | AST_if (guard, t_stat, f_stat) -> assert false
-      | AST_while (guard, body) -> assert false
+      | AST_block _ -> assert false(*List.fold_left (fun a -> fun b -> eval_stat b a) (env,E.empty) sl *)
+      | AST_assign (_, _) -> assert false
+      | AST_if (_, _, _) -> assert false
+      | AST_while (_, _) -> assert false
       | AST_HALT -> assert false
-      | AST_assert guard -> assert false
-      | AST_print l -> assert false
-      | AST_local l -> assert false
+      | AST_assert _ -> assert false
+      | AST_print _ -> assert false
+      | AST_local _ -> assert false
     in
     env, err
 
@@ -59,14 +71,14 @@ struct
   let init : env = Env.init
 
   let lfp (type a)
-      (is_le: a -> a -> bool)
-      (widen: a -> a -> a)
-      (narrow: a -> a -> a)
-      (f: a -> a)
-      (x: a) : a =
+      (_: a -> a -> bool)
+      (_: a -> a -> a)
+      (_: a -> a -> a)
+      (_: a -> a)
+      (_: a) : a =
     assert false
 
-  let eval_stat (s, ext: stat ext) (env: env) : env * err =
+  let eval_stat (s, _: stat ext) (_: env) : env * err =
     match s with
     | AST_block _
     | AST_assign (_, _)

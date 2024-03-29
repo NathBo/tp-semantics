@@ -102,11 +102,34 @@ module MakeConcrete(V: VALUE) : ENVIRONMENT
          | AST_GREATER_EQUAL -> V.greater_eq
          | AST_AND -> V.logical_and
          | AST_OR -> V.logical_or) in
-      in
-      i, E.union err err_
 
-    let eval_assign (l, _: lvalue ext) (e: expr ext) (env: env) : env * err =
-      assert false
+      let rep = ref IvalSet.empty in
+      let reperr = ref err in
+
+      let aux1 x y =
+        let z = f x y ext in
+        rep := IvalSet.add (fst(z)) !rep;
+        reperr := E.union (snd z) !reperr
+      in
+
+      let aux2 x =
+          IvalSet.iter (aux1 x) arg2 in
+
+      IvalSet.iter aux2 arg1;
+      
+      !rep,E.union err err
+
+      let eval_assign (l, _: lvalue ext) (e: expr ext) (env: env) : env * err =
+        Env.fold
+          (fun simple_env (acc, err) ->
+             let v, new_err = eval_expr e simple_env in
+             let env = IvalSet.fold
+               (fun ival acc -> Env.add (SimpleEnv.add l ival simple_env) acc)
+               v Env.empty in
+              Env.union env acc, E.union err new_err)
+          env
+          (Env.empty, E.empty)
+  
 
     let can_be_true (v: IvalSet.t) ext : bool * err =
       IvalSet.fold
@@ -183,7 +206,7 @@ module MakeConcrete(V: VALUE) : ENVIRONMENT
 
     let widen: env -> env -> env = union
     let narrow: env -> env -> env = inter
-    let is_le: env -> env -> bool = assert false (* Leave empty for TP1, possiblement ajouter 2 arg *)
+    let is_le: env -> env -> bool = fun _ _ -> assert false (* Leave empty for TP1, possiblement ajouter 2 arg *)
 
     let get_constrains: env -> C.t = fun _ -> C.empty
     let use_constrains: C.t -> env -> env = fun _ a -> a
@@ -197,18 +220,75 @@ module TypingEnv(E: Errors.ERRORS) : ENVIRONMENT
   (struct
     module E = E
     module C = SimpleConstraints
-    type env
+    type ty_value = Int | Bool | Bot | Top
+    module Env = Mapext.Make(struct type t = variable let compare = compare end)
+    type env = ty_value Env.t
     type err = E.t
-    let compare = assert false
-    let init: env = assert false
-    let bot = assert false
-    let int = assert false
-    let bool = assert false
-    let eval_assign (lvalue, ext: lvalue ext) (expr: expr ext) (env: env) : env * err =
-      assert false
+    let compare = Env.compare (compare)
+    let init: env = Env.empty
+    let bot = Bot
+    let int = Int
+    let bool = Bool
+    let stronger ty1 ty2 =
+      match ty1,ty2 with
+        | Bot,_ | _,Bot -> Bot
+        | Top,_ | _,Top | Bool,Int | Int,Bool -> Top
+        | Bool,Bool -> Bool
+        | Int,Int -> Int
 
-    let eval_guard (expr: expr ext) (env: env) : env * err =
-      assert false
+    let rec eval_expr ext env expr = match expr with
+      | AST_int_const _ -> Int,E.empty
+      | AST_bool_const _ -> Bool,E.empty
+      | AST_int_rand _ -> Int,E.empty
+      | AST_variable (x,_) -> Env.find x env,E.empty
+      | AST_unary (op,(e,ext)) -> (match op with
+        | AST_UNARY_PLUS | AST_UNARY_MINUS -> let t,err =  eval_expr ext env e in
+          if t = Bool
+            then Bot,E.union err (E.error(E.make_err Typing "" ext))
+            else t,err
+        | AST_NOT -> let t,err =  eval_expr ext env e in
+        if t = Int
+          then Bot,E.union err (E.error(E.make_err Typing "" ext))
+          else t,err
+        )
+      | AST_binary (op,(e1,ext1),(e2,ext2)) -> (match op with
+          | AST_PLUS | AST_MINUS | AST_MULTIPLY | AST_DIVIDE | AST_MODULO -> let t1,err1 =  eval_expr ext env e1 in
+            let t2,err2 =  eval_expr ext env e2 in
+            let err = E.union err1 err2 in
+            if t1=Bool || t2=Bool
+            then Bot,E.union err (E.error(E.make_err Typing "" ext))
+            else stronger t1 t2,err
+          | AST_AND | AST_OR -> let t1,err1 =  eval_expr ext env e1 in
+            let t2,err2 =  eval_expr ext env e2 in
+            let err = E.union err1 err2 in
+            if t1=Int || t2=Int
+            then Bot,E.union err (E.error(E.make_err Typing "" ext))
+            else stronger t1 t2,err
+          | AST_GREATER | AST_GREATER_EQUAL | AST_LESS | AST_LESS_EQUAL -> let t1,err1 =  eval_expr ext env e1 in
+          let t2,err2 =  eval_expr ext env e2 in
+          let err = E.union err1 err2 in
+          if t1=Bool || t2=Bool
+          then Bot,E.union err (E.error(E.make_err Typing "" ext))
+          else if t1=Int && t2=Int
+          then Bool,err
+          else stronger t1 t2,err
+          | AST_EQUAL | AST_NOT_EQUAL -> let t1,err1 =  eval_expr ext env e1 in
+          let t2,err2 =  eval_expr ext env e2 in
+          let err = E.union err1 err2 in
+          if (t1=Bool && t2=Bool) || (t1=Int && t2=Int)
+          then Bot,E.union err (E.error(E.make_err Typing "" ext))
+          else stronger t1 t2,err
+          )
+
+    let eval_assign (lvalue, ext: lvalue ext) ((expr,ext): expr ext) (env: env) : env * err =
+      
+      let t,err = eval_expr ext env expr in
+      let env = Env.add lvalue t env in
+      env,err
+
+    let eval_guard ((expr,ext): expr ext) (env: env) : env * err =
+      let _,err = eval_expr ext env expr in
+      env,err
 
     let eval_assert (expr: expr ext) (env: env) : env * err =
       assert false
